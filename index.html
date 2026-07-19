@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="pt-BR"><head><script>window["__codeletBootstrap__"]=JSON.parse('{"A":"A","B":"20260717-05-8209e4e"}');</script><script src="/_sdk/f432b76fb310b513.telemetry_sdk.js" integrity="sha512-9FJQ55EKmmqhyyik8BhrMVfm0+iYYfb8uOlRsjtkxJMEI97qOVEI4PnHohDjQAtvAep0IOEpdQ64eki0sz62ug=="></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo da Memória</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet">
+  <style>
+        body { font-family: 'DM Sans', sans-serif; }
+        .card-container { perspective: 800px; cursor: pointer; }
+        .card-inner {
+            position: relative; width: 100%; height: 100%;
+            transition: transform 0.5s ease; transform-style: preserve-3d;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .card-inner { transition: none; }
+            .star { animation: none !important; }
+        }
+        .card-container.flipped .card-inner { transform: rotateY(180deg); }
+        .card-face {
+            position: absolute; width: 100%; height: 100%;
+            backface-visibility: hidden; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .card-back { transform: rotateY(180deg); }
+        .card-container.matched .card-inner { box-shadow: 0 0 16px rgba(134,239,172,0.6); border-radius: 16px; }
+        .card-container:focus { outline: 3px solid #6366f1; outline-offset: 3px; border-radius: 16px; }
+        @keyframes float-star {
+            0% { transform: translateY(0) scale(0.5); opacity: 1; }
+            100% { transform: translateY(-180px) scale(1.3); opacity: 0; }
+        }
+        .star { animation: float-star 2.5s ease-out forwards; }
+        .timer-bar { transition: width 1s linear; }
+        .overlay { background: rgba(0,0,0,0.3); backdrop-filter: blur(4px); }
+        .screen { display: none; }
+        .screen.active { display: flex; }
+        .card-svg { width: 70%; height: 70%; }
+    </style>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
+  <script src="/_sdk/e3937a0574eb2d69.data_sdk.js" type="text/javascript" integrity="sha512-xbp/ACqEQy1aDxYMtXTrR3y5MUbzxuggRR/9sD48Gl4VhLMMCiAHsxMaFV6DTdeBpR6ymF+t2zhPKYkWM3+Jfw=="></script>
+  <script src="/_sdk/9432170dbd2ae0df.resizing_sdk.js" type="text/javascript" integrity="sha512-FeT+58sb1f9ejWPWFjCbJvTT+SDwGV+ngrHUnlO7TWEOoqwOLj6p256kO3vOL7DIWl1cIgrobiof8v2bOigwPg=="></script>
+ </head>
+ <body data-template-id="__page-root" class="w-full min-h-screen flex flex-col items-center justify-center p-4" style="min-height: calc(100 * min(var(--vh, 1vh), 1vh)); background: linear-gradient(180deg, #f0f4f8, #e8edf5);"><!-- HOME SCREEN -->
+  <div id="home-screen" class="screen active flex-col items-center gap-5 w-full max-w-md text-center">
+   <h1 data-template-id="game-title" class="canva-text text-3xl font-bold" style="color: rgb(74, 85, 104); font-weight: 700; font-style: normal; font-size: 36px;">Jogo da Memória 🐾</h1>
+   <p data-template-id="intro-text" class="canva-text text-base leading-relaxed max-w-sm" style="color: rgb(100, 116, 139); font-weight: 500; font-style: normal; font-size: 18px;">Encontre os pares de animais! Vire as cartas devagar e com calma. Você consegue!</p>
+   <div id="progress-summary" class="text-sm text-gray-500"></div><button data-template-id="start-button" class="canva-button px-10 py-4 rounded-full text-lg font-bold shadow-md hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-green-200" style="background: rgb(129, 201, 149); color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 18px;" onclick="showLevels()">Começar ▶</button> <button data-template-id="settings-button" class="canva-button px-6 py-2 rounded-full text-sm font-medium hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-indigo-200" style="background: rgb(226, 232, 240); color: rgb(71, 85, 105); font-weight: 500; font-style: normal; font-size: 18px;" onclick="openSettings()">⚙️ Configurações</button>
+  </div><!-- LEVEL SELECT -->
+  <div id="level-screen" class="screen flex-col items-center gap-4 w-full max-w-md">
+   <h2 data-template-id="levels-title" class="canva-text text-2xl font-bold" style="color: rgb(74, 85, 104); font-weight: 700; font-style: normal; font-size: 27px;">Escolha um Nível</h2>
+   <div id="level-grid" class="grid grid-cols-2 gap-4 w-full"></div><button data-template-id="back-home-button" class="canva-button px-6 py-2 rounded-full text-sm mt-2 focus:outline-none focus:ring-4 focus:ring-gray-200" style="background: rgb(226, 232, 240); color: rgb(71, 85, 105); font-weight: 500; font-style: normal; font-size: 18px;" onclick="showScreen('home-screen')">← Voltar</button>
+  </div><!-- GAME SCREEN -->
+  <div id="game-screen" class="screen flex-col items-center gap-3 w-full max-w-lg">
+   <div class="flex items-center justify-between w-full max-w-md px-2"><button aria-label="Voltar" class="p-2 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-gray-200" onclick="showScreen('level-screen')">
+     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5M12 19l-7-7 7-7"></path>
+     </svg></button>
+    <div id="game-stats" class="flex gap-4 text-sm text-gray-600"></div>
+   </div>
+   <div id="timer-container" class="hidden w-full max-w-md h-2 bg-gray-200 rounded-full overflow-hidden">
+    <div id="timer-bar" class="timer-bar h-full rounded-full" style="width:100%;background:#86efac"></div>
+   </div>
+   <div id="game-grid" class="grid gap-3 w-full max-w-md mx-auto place-items-center"></div><button data-template-id="hint-button" class="canva-button px-6 py-2 rounded-full text-sm font-medium shadow hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-yellow-200" style="background: rgb(251, 211, 141); color: rgb(116, 66, 16); font-weight: 600; font-style: normal; font-size: 18px;" onclick="useHint()">💡 Dica</button>
+  </div><!-- VICTORY MODAL -->
+  <div id="victory-screen" class="screen fixed inset-0 overlay items-center justify-center z-50">
+   <div class="bg-white rounded-3xl p-8 max-w-sm w-full mx-4 flex flex-col items-center gap-4 relative shadow-xl">
+    <div id="stars-container" class="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl"></div>
+    <h2 data-template-id="congrats-message" class="canva-text text-2xl font-bold text-center relative z-10" style="color: rgb(45, 55, 72); font-weight: 700; font-style: normal; font-size: 27px;">Parabéns! Você conseguiu! 🎉</h2>
+    <p data-template-id="congrats-sub" class="canva-text text-center relative z-10" style="color: rgb(113, 128, 150); font-weight: 500; font-style: normal; font-size: 18px;">Muito bem! Você é incrível!</p>
+    <div class="flex gap-3 relative z-10"><button data-template-id="next-button" class="canva-button px-6 py-3 rounded-full font-bold shadow-md hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-green-200" style="background: rgb(129, 201, 149); color: rgb(255, 255, 255); font-weight: 700; font-style: normal; font-size: 18px;" onclick="nextLevel()">Próximo Nível →</button> <button data-template-id="restart-button" class="canva-button px-6 py-3 rounded-full font-medium shadow hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-gray-200" style="background: rgb(226, 232, 240); color: rgb(71, 85, 105); font-weight: 500; font-style: normal; font-size: 18px;" onclick="restartLevel()">Jogar de Novo</button>
+    </div>
+   </div>
+  </div><!-- SETTINGS OVERLAY -->
+  <div id="settings-screen" class="screen fixed inset-0 overlay items-center justify-center z-50">
+   <div class="bg-white rounded-3xl p-6 max-w-sm w-full mx-4 flex flex-col gap-4 shadow-xl">
+    <h2 data-template-id="settings-title" class="canva-text text-xl font-bold" style="color: rgb(74, 85, 104); font-weight: 700; font-style: normal; font-size: 27px;">Configurações</h2>
+    <div class="flex items-center justify-between"><span data-template-id="sound-label" class="canva-text text-sm" style="color: rgb(71, 85, 105); font-weight: 500; font-style: normal; font-size: 18px;">Som suave</span> <input type="checkbox" id="sound-toggle" class="w-6 h-6 rounded" onchange="saveSettings()">
+    </div>
+    <div class="flex items-center justify-between"><span data-template-id="timer-label" class="canva-text text-sm" style="color: rgb(71, 85, 105); font-weight: 500; font-style: normal; font-size: 18px;">Tempo (Nível Avançado)</span> <input type="checkbox" id="timer-toggle" class="w-6 h-6 rounded" onchange="saveSettings()">
+    </div>
+    <div class="flex items-center justify-between"><span data-template-id="theme-label" class="canva-text text-sm" style="color: rgb(71, 85, 105); font-weight: 500; font-style: normal; font-size: 18px;">Tema (em breve)</span> <select id="theme-select" class="px-3 py-1 rounded-lg border border-gray-200 text-sm" disabled=""><option>Animais da Fazenda</option></select>
+    </div>
+    <p data-template-id="settings-hint" class="canva-text text-xs leading-relaxed" style="color: rgb(148, 163, 184); font-weight: 500; font-style: normal; font-size: 18px;">Este jogo respeita as configurações de movimento reduzido do seu dispositivo.</p><button data-template-id="close-settings-button" class="canva-button px-6 py-2 rounded-full text-sm font-medium self-center focus:outline-none focus:ring-4 focus:ring-gray-200" style="background: rgb(226, 232, 240); color: rgb(71, 85, 105); font-weight: 500; font-style: normal; font-size: 18px;" onclick="closeSettings()">Fechar</button>
+   </div>
+  </div>
+  <script src="/_sdk/b7bbbe551ba4f8f5.editing_sdk.js" integrity="sha512-h06pMz6KcVo4Wjvoggb4sS5DZpb55bTriAzBmA0YwbkBA3z2ZXl8CBEbCWT+/fAsm0SwDejJ7jJHOZsLZKqPoQ=="></script>
+  <script>
+/* ===== SVG ANIMAL ART ===== */
+const SVG_ANIMALS = {
+    elephant: `<svg viewBox="0 0 100 100" class="card-svg"><circle cx="50" cy="55" r="28" fill="#b0c4de"/><ellipse cx="35" cy="45" rx="12" ry="15" fill="#a0b4ce"/><ellipse cx="65" cy="45" rx="12" ry="15" fill="#a0b4ce"/><circle cx="44" cy="50" r="4" fill="#333"/><circle cx="56" cy="50" r="4" fill="#333"/><path d="M45 62 Q50 68 55 62" stroke="#555" fill="none" stroke-width="2" stroke-linecap="round"/><path d="M50 65 Q48 80 50 85 Q52 80 50 65" fill="#a0b4ce"/></svg>`,
+    chick: `<svg viewBox="0 0 100 100" class="card-svg"><circle cx="50" cy="55" r="25" fill="#fde68a"/><circle cx="50" cy="38" r="18" fill="#fde68a"/><circle cx="44" cy="35" r="3" fill="#333"/><circle cx="56" cy="35" r="3" fill="#333"/><polygon points="50,40 46,44 54,44" fill="#f97316"/><ellipse cx="35" cy="58" rx="8" ry="5" fill="#fbbf24" transform="rotate(-20 35 58)"/><ellipse cx="65" cy="58" rx="8" ry="5" fill="#fbbf24" transform="rotate(20 65 58)"/></svg>`,
+    cow: `<svg viewBox="0 0 100 100" class="card-svg"><ellipse cx="50" cy="58" rx="28" ry="24" fill="#fff"/><circle cx="50" cy="40" r="20" fill="#fff"/><ellipse cx="38" cy="30" rx="6" ry="8" fill="#f5f5f5" stroke="#999" stroke-width="1"/><ellipse cx="62" cy="30" rx="6" ry="8" fill="#f5f5f5" stroke="#999" stroke-width="1"/><circle cx="44" cy="38" r="3" fill="#333"/><circle cx="56" cy="38" r="3" fill="#333"/><ellipse cx="50" cy="48" rx="10" ry="7" fill="#fecaca"/><circle cx="47" cy="47" r="2" fill="#999"/><circle cx="53" cy="47" r="2" fill="#999"/><ellipse cx="40" cy="55" rx="8" ry="10" fill="#a16207" opacity="0.4"/><ellipse cx="58" cy="62" rx="6" ry="8" fill="#a16207" opacity="0.4"/></svg>`,
+    rabbit: `<svg viewBox="0 0 100 100" class="card-svg"><ellipse cx="50" cy="62" rx="22" ry="20" fill="#fef3c7"/><circle cx="50" cy="42" r="18" fill="#fef3c7"/><ellipse cx="42" cy="20" rx="6" ry="16" fill="#fef3c7"/><ellipse cx="42" cy="20" rx="3" ry="12" fill="#fbcfe8"/><ellipse cx="58" cy="20" rx="6" ry="16" fill="#fef3c7"/><ellipse cx="58" cy="20" rx="3" ry="12" fill="#fbcfe8"/><circle cx="44" cy="40" r="3" fill="#333"/><circle cx="56" cy="40" r="3" fill="#333"/><ellipse cx="50" cy="48" rx="4" ry="3" fill="#fca5a5"/><path d="M46 50 Q50 54 54 50" stroke="#999" fill="none" stroke-width="1.5"/></svg>`
+};
+
+const ANIMALS = [
+    { id: 'elephant', name: 'Elefante' },
+    { id: 'chick', name: 'Pintinho' },
+    { id: 'cow', name: 'Vaquinha' },
+    { id: 'rabbit', name: 'Coelhinho' }
+];
+
+const TINTS = [
+    { border: '#c7d2fe', bg: '#eef2ff', motif: '✿' },
+    { border: '#bbf7d0', bg: '#f0fdf4', motif: '♡' },
+    { border: '#fde68a', bg: '#fffbeb', motif: '★' },
+    { border: '#fbcfe8', bg: '#fdf2f8', motif: '◆' },
+    { border: '#a5f3fc', bg: '#ecfeff', motif: '○' },
+    { border: '#fed7aa', bg: '#fff7ed', motif: '△' },
+    { border: '#e9d5ff', bg: '#faf5ff', motif: '♦' },
+    { border: '#fecaca', bg: '#fef2f2', motif: '☆' },
+    { border: '#d9f99d', bg: '#f7fee7', motif: '◇' },
+    { border: '#99f6e4', bg: '#f0fdfa', motif: '❀' }
+];
+
+const LEVELS = [
+    { pairs: 2, cols: 2, rows: 2, label: 'Nível Inicial' },
+    { pairs: 4, cols: 4, rows: 2, label: 'Nível Fácil' },
+    { pairs: 6, cols: 4, rows: 3, label: 'Nível Médio' },
+    { pairs: 10, cols: 5, rows: 4, label: 'Nível Avançado' }
+];
+
+/* ===== STATE ===== */
+let state = { unlockedLevel: 0, currentLevel: 0, soundOn: false, timerOn: false };
+let flippedCards = [];
+let matchedPairs = 0;
+let totalPairs = 0;
+let locked = false;
+let hintAvailable = true;
+let timerInterval = null;
+let audioCtx = null;
+
+/* ===== PERSISTENCE (localStorage only) ===== */
+function loadState() {
+    try {
+        const s = JSON.parse(localStorage.getItem('memory-game-state') || '{}');
+        state.unlockedLevel = Math.min(s.unlockedLevel || 0, 3);
+        state.soundOn = !!s.soundOn;
+        state.timerOn = !!s.timerOn;
+    } catch(e) {}
+    document.getElementById('sound-toggle').checked = state.soundOn;
+    document.getElementById('timer-toggle').checked = state.timerOn;
+    updateProgress();
+}
+
+function saveState() {
+    try { localStorage.setItem('memory-game-state', JSON.stringify(state)); } catch(e) {}
+}
+
+function saveSettings() {
+    state.soundOn = document.getElementById('sound-toggle').checked;
+    state.timerOn = document.getElementById('timer-toggle').checked;
+    saveState();
+}
+
+function updateProgress() {
+    document.getElementById('progress-summary').textContent = `Nível desbloqueado: ${state.unlockedLevel + 1} de 4`;
+}
+
+/* ===== SCREENS ===== */
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id === 'level-screen') buildLevelSelect();
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+function showLevels() { showScreen('level-screen'); }
+function openSettings() { showScreen('settings-screen'); }
+function closeSettings() { showScreen('home-screen'); }
+
+function buildLevelSelect() {
+    const grid = document.getElementById('level-grid');
+    grid.innerHTML = '';
+    const icons = ['🌱','🌿','🌳','🌟'];
+    for (let i = 0; i < 4; i++) {
+        const unlocked = i <= state.unlockedLevel;
+        const btn = document.createElement('button');
+        btn.className = `p-4 rounded-2xl text-center font-bold text-lg shadow-sm transition-transform focus:outline-none focus:ring-4 focus:ring-indigo-200 ${unlocked ? 'bg-green-50 border-2 border-green-200 hover:scale-105 cursor-pointer' : 'bg-gray-100 border-2 border-gray-200 opacity-60 cursor-not-allowed'}`;
+        btn.setAttribute('aria-label', `${LEVELS[i].label}${unlocked ? '' : ' bloqueado'}`);
+        btn.innerHTML = `<span class="text-2xl">${unlocked ? icons[i] : '🔒'}</span><br><span class="text-sm">${LEVELS[i].label}</span><br><span class="text-xs text-gray-500">${LEVELS[i].pairs} pares</span>`;
+        if (unlocked) btn.onclick = () => startLevel(i);
+        grid.appendChild(btn);
+    }
+}
+
+/* ===== GAME ===== */
+function startLevel(level) {
+    state.currentLevel = level;
+    matchedPairs = 0;
+    flippedCards = [];
+    locked = false;
+    hintAvailable = true;
+    showScreen('game-screen');
+    const hintBtn = document.querySelector('[data-template-id="hint-button"]');
+    if (hintBtn) hintBtn.style.opacity = '1';
+    buildGrid();
+    updateStats();
+    if (state.timerOn && level === 3) startTimer();
+    else document.getElementById('timer-container').classList.add('hidden');
+}
+
+function getDeckForLevel(pairs) {
+    const deck = [];
+    for (let i = 0; i < pairs; i++) {
+        const animal = ANIMALS[i % ANIMALS.length];
+        const tintIdx = Math.floor(i / ANIMALS.length);
+        deck.push({ ...animal, tint: TINTS[tintIdx], uniqueId: `${animal.id}-${tintIdx}` });
+    }
+    return deck;
+}
+
+function buildGrid() {
+    const level = LEVELS[state.currentLevel];
+    totalPairs = level.pairs;
+    const animals = getDeckForLevel(level.pairs);
+    const cards = [...animals, ...animals];
+    for (let i = cards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cards[i], cards[j]] = [cards[j], cards[i]];
+    }
+    const grid = document.getElementById('game-grid');
+    grid.innerHTML = '';
+    grid.style.gridTemplateColumns = `repeat(${level.cols}, 1fr)`;
+    const maxW = Math.min(420, window.innerWidth - 32);
+    const cardSize = Math.floor((maxW - (level.cols - 1) * 12) / level.cols);
+    const size = Math.min(cardSize, 110);
+
+    cards.forEach((animal, i) => {
+        const container = document.createElement('button');
+        container.className = 'card-container';
+        container.style.width = size + 'px';
+        container.style.height = size + 'px';
+        container.setAttribute('aria-label', `Carta ${i + 1}`);
+        container.setAttribute('role', 'button');
+        container.setAttribute('tabindex', '0');
+        container.dataset.uniqueId = animal.uniqueId;
+
+        const tint = animal.tint;
+        const svg = SVG_ANIMALS[animal.id];
+        const showMotif = tint.motif !== '✿' || Math.floor(i / ANIMALS.length) > 0;
+
+        container.innerHTML = `
+            <div class="card-inner">
+                <div class="card-face bg-indigo-50 border-2 border-indigo-100 shadow-sm">
+                    <span class="text-3xl">🐾</span>
+                </div>
+                <div class="card-face card-back border-2 shadow-sm relative" style="border-color:${tint.border};background:${tint.bg}">
+                    <div class="flex flex-col items-center justify-center w-full h-full p-1">
+                        ${svg}
+                        ${showMotif ? `<span class="absolute top-1 right-1 text-xs opacity-60">${tint.motif}</span>` : ''}
+                    </div>
+                </div>
+            </div>`;
+        container.addEventListener('click', () => flipCard(container));
+        container.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(container); } });
+        grid.appendChild(container);
+    });
+}
+
+function flipCard(card) {
+    if (locked || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+    card.classList.add('flipped');
+    flippedCards.push(card);
+    playSound(false);
+    if (flippedCards.length === 2) {
+        locked = true;
+        const [a, b] = flippedCards;
+        if (a.dataset.uniqueId === b.dataset.uniqueId && a !== b) {
+            a.classList.add('matched');
+            b.classList.add('matched');
+            matchedPairs++;
+            playSound(true);
+            updateStats();
+            flippedCards = [];
+            locked = false;
+            if (matchedPairs === totalPairs) setTimeout(levelComplete, 600);
+        } else {
+            setTimeout(() => {
+                a.classList.remove('flipped');
+                b.classList.remove('flipped');
+                flippedCards = [];
+                locked = false;
+            }, 1000);
+        }
+    }
+}
+
+function updateStats() {
+    document.getElementById('game-stats').innerHTML = `<span>Par ${matchedPairs} de ${totalPairs} encontrados</span>`;
+}
+
+function useHint() {
+    if (!hintAvailable) return;
+    hintAvailable = false;
+    locked = true;
+    const cards = document.querySelectorAll('.card-container:not(.matched)');
+    cards.forEach(c => c.classList.add('flipped'));
+    setTimeout(() => {
+        cards.forEach(c => { if (!c.classList.contains('matched')) c.classList.remove('flipped'); });
+        locked = false;
+    }, 1500);
+    const hintBtn = document.querySelector('[data-template-id="hint-button"]');
+    if (hintBtn) hintBtn.style.opacity = '0.4';
+}
+
+function startTimer() {
+    const container = document.getElementById('timer-container');
+    const bar = document.getElementById('timer-bar');
+    container.classList.remove('hidden');
+    let timeLeft = 120;
+    bar.style.width = '100%';
+    bar.style.background = '#86efac';
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        bar.style.width = (timeLeft / 120 * 100) + '%';
+        if (timeLeft <= 30) bar.style.background = '#fde047';
+        if (timeLeft <= 0) clearInterval(timerInterval);
+    }, 1000);
+}
+
+function levelComplete() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    showScreen('victory-screen');
+    spawnStars();
+    playSound(true);
+    if (state.currentLevel >= state.unlockedLevel && state.currentLevel < 3) {
+        state.unlockedLevel = state.currentLevel + 1;
+    }
+    saveState();
+    updateProgress();
+}
+
+function spawnStars() {
+    const container = document.getElementById('stars-container');
+    container.innerHTML = '';
+    for (let i = 0; i < 10; i++) {
+        const star = document.createElement('span');
+        star.textContent = '⭐';
+        star.className = 'star absolute text-xl';
+        star.style.left = (5 + Math.random() * 90) + '%';
+        star.style.bottom = '10%';
+        star.style.animationDelay = (i * 0.25) + 's';
+        container.appendChild(star);
+    }
+}
+
+function nextLevel() {
+    if (state.currentLevel < 3) startLevel(state.currentLevel + 1);
+    else showScreen('home-screen');
+}
+
+function restartLevel() { startLevel(state.currentLevel); }
+
+function playSound(success) {
+    if (!state.soundOn) return;
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(success ? 523 : 440, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    } catch(e) {}
+}
+
+/* ===== INIT ===== */
+loadState();
+    </script>
+ 
+</body></html>
